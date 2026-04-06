@@ -3,7 +3,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-IN_STOCK_TEXT = "カートに入れる"
+DEFAULT_IN_STOCK_TEXT = "カートに入れる"
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
@@ -12,12 +12,15 @@ HEADERS = {
 }
 
 
-def check_stock(url: str) -> bool:
+def check_stock(url: str, in_stock_text: str = None, sold_out_text: str = None) -> bool:
     """回傳 True 表示有庫存"""
     response = requests.get(url, headers=HEADERS, timeout=15)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
-    return IN_STOCK_TEXT in soup.get_text()
+    page_text = soup.get_text()
+    if sold_out_text:
+        return sold_out_text not in page_text
+    return (in_stock_text or DEFAULT_IN_STOCK_TEXT) in page_text
 
 
 def send_telegram(message: str):
@@ -38,7 +41,7 @@ def main():
         name = product["name"]
         url = product["url"]
         try:
-            in_stock = check_stock(url)
+            in_stock = check_stock(url, product.get("in_stock_text"), product.get("sold_out_text"))
             status = "有庫存" if in_stock else "缺貨"
             print(f"[{status}] {name}")
             if in_stock:
